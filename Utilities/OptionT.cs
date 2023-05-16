@@ -21,12 +21,18 @@ namespace ParadoxFramework.Utilities
         }
         public OptionT(T value, T defaultValue) : this()
         {
-            _hasValue = true;
-
             if (value != null)
+            {
                 _result = value;
-            else
+                _hasValue = true;
+            }
+            else if (defaultValue != null)
+            {
                 _result = defaultValue;
+                _hasValue = true;
+            }
+            else
+                _hasValue = false;
         }
 
         /// <summary>
@@ -87,6 +93,40 @@ namespace ParadoxFramework.Utilities
                 return map(_result);
 
             return map(defaultValue);
+        }
+
+        /// <summary>
+        /// Map the OptionT value with the given function and save the new value.
+        /// </summary>
+        /// <param name="map"></param>
+        public void Map(Func<T, T> map)
+        {
+            if (_hasValue)
+                _result = map(_result);
+        }
+        /// <summary>
+        /// Map the OptionT value with the given function, if don't had value use the given defaultValue, and save the new value.
+        /// </summary>
+        /// <param name="map"></param>
+        /// <param name="defaultValue"></param>
+        public void Map(Func<T, T> map, T defaultValue)
+        {
+            if (_hasValue)
+            {
+                _result = map(_result);
+                return;
+            }
+            _result = map(defaultValue);
+        }
+
+        /// <summary>
+        /// Iterate the value but don't save a modify version of it, use it only for the side effect of the given function.
+        /// </summary>
+        /// <param name="iterate"></param>
+        public void Iterate(Action<T> iterate)
+        {
+            if (_hasValue)
+                iterate(_result);
         }
     }
 }

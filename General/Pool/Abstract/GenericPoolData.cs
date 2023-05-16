@@ -11,6 +11,7 @@ namespace ParadoxFramework.General.Pool
         public T Prefab;
         public OptionT<Transform> Parent;
         public Action<GameObject> OnReturnReset;
+        public Action<GameObject> OnFactoryCreation;
         public Stack<GameObject> AvalibleObjects;
     }
 }

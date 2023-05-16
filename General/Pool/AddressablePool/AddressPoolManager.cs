@@ -23,14 +23,16 @@ namespace ParadoxFramework.General.Pool
         public AssetReferenceGameObject Reference;
         public OptionT<Transform> Parent;
         public OptionT<Action<GameObject>> OnReturnReset;
+        public OptionT<Action<GameObject>> OnFactoryCreation;
 
-        public AddressCreationPoolArg(string poolName, int initialAmount, AssetReferenceGameObject prefabReference, Transform parent = null, Action<GameObject> onReturnPool = null) : this()
+        public AddressCreationPoolArg(string poolName, int initialAmount, AssetReferenceGameObject prefabReference, Transform parent = null, Action<GameObject> onReturnPool = null, Action<GameObject> onFactory = null) : this()
         {
             Name = poolName;
             Amount = initialAmount;
             Reference = prefabReference;
             Parent = new OptionT<Transform>(parent);
             OnReturnReset = new OptionT<Action<GameObject>>(onReturnPool);
+            OnFactoryCreation = new OptionT<Action<GameObject>>(onFactory);
         }
 
         public AddressCreationPoolArg(AddressPoolConfigData data) : this(data.Name, data.Amount, data.Reference, data.Parent) { }
@@ -80,6 +82,7 @@ namespace ParadoxFramework.General.Pool
                 Prefab = args.Reference,
                 Parent = args.Parent,
                 OnReturnReset = onReturn,
+                OnFactoryCreation = args.OnFactoryCreation.Get(delegate { }),
                 AvalibleObjects = new Stack<GameObject>()
             };
             _poolData.Add(args.Name, poolData);
@@ -109,7 +112,63 @@ namespace ParadoxFramework.General.Pool
         /// </summary>
         /// <param name="poolName"></param>
         /// <returns></returns>
-        public bool PoolExist(string poolName) => _poolData.ContainsKey(poolName);
+        public bool IsPoolExist(string poolName) => _poolData.ContainsKey(poolName);
+        /// <summary>
+        /// Return true if the pool is empty.
+        /// </summary>
+        /// <param name="poolName"></param>
+        /// <returns></returns>
+        public bool IsPoolEmpty(string poolName)
+        {
+            PoolExistChecker(poolName, "checking pool is empty");
+            return _poolData[poolName].AvalibleObjects.Any();
+        }
+
+        /// <summary>
+        /// Add another event to the return pool, called when an instance return to the pool.
+        /// </summary>
+        /// <param name="poolName"></param>
+        /// <param name="onReturnInstance"></param>
+        public void AddReturnPoolEvent(string poolName, Action<GameObject> onReturnInstance)
+        {
+            PoolExistChecker(poolName, "adding return event");
+            _poolData[poolName].OnReturnReset += onReturnInstance;
+        }
+        /// <summary>
+        /// Reset the return pool event, called when an instance return to the pool.
+        /// </summary>
+        /// <param name="poolName"></param>
+        public void ResetReturnPoolEvent(string poolName)
+        {
+            PoolExistChecker(poolName, "reseting return event");
+
+            var data = _poolData[poolName];
+            data.OnReturnReset = i =>
+            {
+                i.SetActive(false);
+                i.transform.parent = data.Parent.Get(_trm.Get());
+            };
+        }
+
+        /// <summary>
+        /// Add another factory event, called when a new instance is created for the pool.
+        /// </summary>
+        /// <param name="poolName"></param>
+        /// <param name="onFactoryCreation"></param>
+        public void AddOnFactoryPoolEvent(string poolName, Action<GameObject> onFactoryCreation)
+        {
+            PoolExistChecker(poolName, "adding factory event");
+            _poolData[poolName].OnFactoryCreation += onFactoryCreation;
+        }
+        /// <summary>
+        /// Reset the factory event, called when a new instance is created for the pool.
+        /// </summary>
+        /// <param name="poolName"></param>
+        public void ResetFactoryPoolEvent(string poolName)
+        {
+            PoolExistChecker(poolName, "reseting factory event");
+            _poolData[poolName].OnFactoryCreation = delegate { };
+        }
 
         /// <summary>
         /// Get an instance from the pool, how the creation is async need a callback to set the object.
@@ -253,7 +312,7 @@ namespace ParadoxFramework.General.Pool
 
         private void PoolExistChecker(string poolName, string actionMessage)
         {
-            if (!PoolExist(poolName))
+            if (!IsPoolExist(poolName))
                 PoolErrorHandler.ThrowError(EPoolExceptions.PoolDontExistException, "AddressPool", actionMessage, poolName);
         }
 
@@ -268,6 +327,7 @@ namespace ParadoxFramework.General.Pool
                     var instance = handler.Result;
                     instance.SetActive(activate);
                     data.AvalibleObjects.Push(instance);
+                    data.OnFactoryCreation(instance);
 
                     callback.Get(DefaultDelegates<GameObject>.EmptyCallback).Invoke(instance);
                 };
@@ -283,6 +343,7 @@ namespace ParadoxFramework.General.Pool
                 var instance = h.Result;
                 instance.SetActive(activate);
                 data.AvalibleObjects.Push(instance);
+                data.OnFactoryCreation(instance);
             };
             return handler.Task;
         }
