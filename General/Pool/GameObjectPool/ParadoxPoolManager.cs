@@ -11,7 +11,7 @@ using ParadoxFramework.General.Pool.ErrorHandler;
 
 namespace ParadoxFramework.General.Pool
 {
-    internal class PoolData : GenericPoolData<GameObject> { }
+    internal class PoolData : UnityGenericPoolData<GameObject> { }
 
     public struct CreationPoolArg
     {
@@ -30,6 +30,7 @@ namespace ParadoxFramework.General.Pool
             Parent = new OptionT<Transform>(parent);
             OnReturnReset = new OptionT<Action<GameObject>>(onReturnPool);
         }
+        public CreationPoolArg(ParadoxPoolConfigData data) : this(data.Name, data.Amount, data.Prefab) { }
     }
 
 
@@ -49,6 +50,14 @@ namespace ParadoxFramework.General.Pool
             }
         }
 
+        public GameObject this[string poolName, int index]
+        {
+            get
+            {
+                PoolExistChecker(poolName, "pool indexing");
+                return _poolData[poolName].AvalibleObjects.Skip(index).First();
+            }
+        }
 
         /// <summary>
         /// Create a new pool with the given prefab.
@@ -84,7 +93,7 @@ namespace ParadoxFramework.General.Pool
             _poolData.Add(args.Name, poolData);
 
             for (int i = 0; i < args.Amount; i++)
-                CreateInstance(args.Name, poolData);
+                CreateInstanceWithoutReturn(args.Name, poolData);
         }
 
         /// <summary>
@@ -100,7 +109,7 @@ namespace ParadoxFramework.General.Pool
 
             var data = _poolData[poolName];
             for (int i = 0; i < amount; i++)
-                CreateInstance(poolName, data);
+                CreateInstanceWithoutReturn(poolName, data);
         }
 
         /// <summary>
@@ -117,7 +126,18 @@ namespace ParadoxFramework.General.Pool
         public bool IsPoolEmpty(string poolName)
         {
             PoolExistChecker(poolName, "checking if pool is empty");
-            return _poolData[poolName].AvalibleObjects.Any();
+            return !_poolData[poolName].AvalibleObjects.Any();
+        }
+
+        /// <summary>
+        /// Return the actual amount of instances on the pool.
+        /// </summary>
+        /// <param name="poolName"></param>
+        /// <returns></returns>
+        public int PoolCount(string poolName)
+        {
+            PoolExistChecker(poolName, "pool count");
+            return _poolData[poolName].AvalibleObjects.Count;
         }
 
         /// <summary>
@@ -242,13 +262,6 @@ namespace ParadoxFramework.General.Pool
         }
 
 
-
-        private void OnDestroy()
-        {
-            _instance = new OptionT<ParadoxPoolManager>();
-            StartCoroutine(TimeSlicingDisposeAll(true));
-        }
-
         private IEnumerator TimeSlicingDisposeAll(bool destroyManager)
         {
             foreach (var data in _poolData.Values)
@@ -263,7 +276,7 @@ namespace ParadoxFramework.General.Pool
         {
             var wait = new WaitForSeconds(0.05f);
 
-            while (data.AvalibleObjects.Peek() != null)
+            while (data.AvalibleObjects.Any())
             {
                 Destroy(data.AvalibleObjects.Pop());
                 yield return wait;
@@ -291,6 +304,13 @@ namespace ParadoxFramework.General.Pool
             data.AvalibleObjects.Push(instance);
             data.OnFactoryCreation(instance);
             return instance;
+        }
+        private void CreateInstanceWithoutReturn(string name, PoolData data)
+        {
+            var instance = GameObject.Instantiate(data.Prefab, data.Parent.Get(_trm.Get()));
+            instance.SetActive(false);
+            data.AvalibleObjects.Push(instance);
+            data.OnFactoryCreation(instance);
         }
 
 

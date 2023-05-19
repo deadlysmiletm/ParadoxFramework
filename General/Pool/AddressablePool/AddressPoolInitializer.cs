@@ -2,7 +2,9 @@
 
 using UnityEngine;
 
-namespace ParadoxFramework.General.Pool
+using ParadoxFramework.General.Pool;
+
+namespace ParadoxFramework.General
 {
     public class AddressPoolInitializer : MonoBehaviour
     {

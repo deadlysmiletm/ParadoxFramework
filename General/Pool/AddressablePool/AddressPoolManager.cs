@@ -14,7 +14,7 @@ using ParadoxFramework.General.Pool.ErrorHandler;
 
 namespace ParadoxFramework.General.Pool
 {
-    internal class AddressPoolData : GenericPoolData<AssetReferenceGameObject> { }
+    internal class AddressPoolData : UnityGenericPoolData<AssetReferenceGameObject> { }
 
     public struct AddressCreationPoolArg
     {
@@ -35,7 +35,7 @@ namespace ParadoxFramework.General.Pool
             OnFactoryCreation = new OptionT<Action<GameObject>>(onFactory);
         }
 
-        public AddressCreationPoolArg(AddressPoolConfigData data) : this(data.Name, data.Amount, data.Reference, data.Parent) { }
+        public AddressCreationPoolArg(AddressPoolConfigData data) : this(data.Name, data.Amount, data.Reference) { }
     }
 
     public class AddressPoolManager : MonoBehaviour
@@ -51,6 +51,15 @@ namespace ParadoxFramework.General.Pool
             {
                 lock (_lock)
                     return _instance.Get(FindOrCreateDispatcher());
+            }
+        }
+
+        public GameObject this[string poolName, int index]
+        {
+            get
+            {
+                PoolExistChecker(poolName, "pool indexing");
+                return _poolData[poolName].AvalibleObjects.Skip(index).First();
             }
         }
 
@@ -121,7 +130,18 @@ namespace ParadoxFramework.General.Pool
         public bool IsPoolEmpty(string poolName)
         {
             PoolExistChecker(poolName, "checking pool is empty");
-            return _poolData[poolName].AvalibleObjects.Any();
+            return !_poolData[poolName].AvalibleObjects.Any();
+        }
+
+        /// <summary>
+        /// Return the actual amount of instances on the pool.
+        /// </summary>
+        /// <param name="poolName"></param>
+        /// <returns></returns>
+        public int PoolCount(string poolName)
+        {
+            PoolExistChecker(poolName, "pool count");
+            return _poolData[poolName].AvalibleObjects.Count;
         }
 
         /// <summary>
@@ -208,6 +228,21 @@ namespace ParadoxFramework.General.Pool
             var instance = data.AvalibleObjects.Any() ? data.AvalibleObjects.Pop() : null;
             return new OptionT<GameObject>(instance);
         }
+        /// <summary>
+        /// Get an instance from the pool, if the pool is empty create a new instance and wait for completition before returning the instance.
+        /// </summary>
+        /// <param name="poolName"></param>
+        /// <returns></returns>
+        public GameObject GetInstanceAndWait(string poolName)
+        {
+            PoolExistChecker(poolName, "get instance and wait");
+
+            var data = _poolData[poolName];
+            if (data.AvalibleObjects.Any())
+                return data.AvalibleObjects.Pop();
+
+            return CreateInstanceAndWait(poolName, data, true);
+        }
 
         /// <summary>
         /// Get an instance async from the pool, returning a Task of the operation.
@@ -266,7 +301,7 @@ namespace ParadoxFramework.General.Pool
 
             var data = _poolData[poolName];
 
-            while (data.AvalibleObjects.Peek() != null)
+            while (data.AvalibleObjects.Any())
                 Addressables.ReleaseInstance(data.AvalibleObjects.Pop());
 
             if (removePoolAndReleaseAsset)
@@ -285,7 +320,7 @@ namespace ParadoxFramework.General.Pool
         {
             foreach (var pool in _poolData.Values)
             {
-                while (pool.AvalibleObjects.Peek() != null)
+                while (pool.AvalibleObjects.Any())
                     Addressables.ReleaseInstance(pool.AvalibleObjects.Pop());
                 pool.Prefab.ReleaseAsset();
             }
@@ -296,12 +331,6 @@ namespace ParadoxFramework.General.Pool
                 Destroy(this.gameObject);
         }
 
-
-        private void OnDestroy()
-        {
-            _instance = new OptionT<AddressPoolManager>();
-            DisposeAll();
-        }
 
         private IEnumerator DelayedReturn(AddressPoolData data, GameObject instance, float delay)
         {
@@ -321,31 +350,33 @@ namespace ParadoxFramework.General.Pool
             data.Prefab.InstantiateAsync(data.Parent.Get(_trm.Get()))
                 .Completed += handler =>
                 {
-                    if (handler.Status != AsyncOperationStatus.Succeeded)
-                        PoolErrorHandler.ThrowError(EPoolExceptions.InstanceCreationException, "AddressPool", $"{handler.OperationException.Message}: {handler.OperationException.StackTrace}", name);
-
-                    var instance = handler.Result;
-                    instance.SetActive(activate);
-                    data.AvalibleObjects.Push(instance);
-                    data.OnFactoryCreation(instance);
-
-                    callback.Get(DefaultDelegates<GameObject>.EmptyCallback).Invoke(instance);
+                    OnCreationInstanceEvent(name, data, handler, activate);
+                    callback.Get(DefaultDelegates<GameObject>.EmptyCallback).Invoke(handler.Result);
                 };
         }
         private Task<GameObject> CreateInstanceAsync(string poolName, AddressPoolData data, bool activate = false)
         {
             var handler = data.Prefab.InstantiateAsync(data.Parent.Get(_trm.Get()));
-            handler.Completed += h =>
-            {
-                if (h.Status != AsyncOperationStatus.Succeeded)
-                    PoolErrorHandler.ThrowError(EPoolExceptions.InstanceCreationException, "AddressPool", $"{h.OperationException.Message}: {h.OperationException.StackTrace}", poolName);
-
-                var instance = h.Result;
-                instance.SetActive(activate);
-                data.AvalibleObjects.Push(instance);
-                data.OnFactoryCreation(instance);
-            };
+            handler.Completed += h => OnCreationInstanceEvent(poolName, data, h, activate);
             return handler.Task;
+        }
+        private GameObject CreateInstanceAndWait(string name, AddressPoolData data, bool activate)
+        {
+            var h = data.Prefab.InstantiateAsync(data.Parent.Get(_trm.Get()));
+            h.Completed += handler => OnCreationInstanceEvent(name, data, handler, activate);
+
+            return h.WaitForCompletion();
+            
+        }
+        private void OnCreationInstanceEvent(string poolName, AddressPoolData data, AsyncOperationHandle<GameObject> handler, bool activate)
+        {
+            if (handler.Status != AsyncOperationStatus.Succeeded)
+                PoolErrorHandler.ThrowError(EPoolExceptions.InstanceCreationException, "AddressPool", $"{handler.OperationException.Message}: {handler.OperationException.StackTrace}", poolName);
+
+            var instance = handler.Result;
+            instance.SetActive(activate);
+            data.AvalibleObjects.Push(instance);
+            data.OnFactoryCreation(instance);
         }
 
         private static AddressPoolManager FindOrCreateDispatcher()

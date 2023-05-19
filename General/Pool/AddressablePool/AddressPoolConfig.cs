@@ -13,7 +13,6 @@ namespace ParadoxFramework.General.Pool
         public string Name;
         public int Amount;
         public AssetReferenceGameObject Reference;
-        public Transform Parent;
     }
     [CreateAssetMenu(fileName = "AddressPoolConfig", menuName = "Paradox Framework/Pool/Addressables Config")]
     public class AddressPoolConfig : ScriptableObject

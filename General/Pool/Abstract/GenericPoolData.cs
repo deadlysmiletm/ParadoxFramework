@@ -1,17 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using UnityEngine;
+﻿///	© Copyright 2023, Lucas Leonardo Conti - DeadlySmileTM
 
-using ParadoxFramework.Utilities;
+using System;
+using System.Collections.Generic;
 
 namespace ParadoxFramework.General.Pool
 {
-    internal abstract class GenericPoolData<T>
+    internal class GenericPoolData<T>
     {
         public T Prefab;
-        public OptionT<Transform> Parent;
-        public Action<GameObject> OnReturnReset;
-        public Action<GameObject> OnFactoryCreation;
-        public Stack<GameObject> AvalibleObjects;
+        public Func<T> OnFactory;
+        public Action<T> OnPoolReturn;
+        public Action<T> OnDestroy;
+        public Stack<T> AvalibleObjects;
     }
 }
