@@ -3,7 +3,6 @@
 using System.Collections.Generic;
 using System.Collections;
 using System;
-using System.Linq;
 using UnityEngine;
 
 using ParadoxFramework.Utilities;
@@ -50,13 +49,14 @@ namespace ParadoxFramework.General.Pool
             }
         }
 
-        public GameObject this[string poolName, int index]
+        /// <summary>
+        /// Get an instance from the pool, internally calls GetInstance.
+        /// </summary>
+        /// <param name="poolName"></param>
+        /// <returns></returns>
+        public GameObject this[string poolName]
         {
-            get
-            {
-                PoolExistChecker(poolName, "pool indexing");
-                return _poolData[poolName].AvalibleObjects.Skip(index).First();
-            }
+            get => GetInstance(poolName);
         }
 
         /// <summary>
@@ -126,7 +126,7 @@ namespace ParadoxFramework.General.Pool
         public bool IsPoolEmpty(string poolName)
         {
             PoolExistChecker(poolName, "checking if pool is empty");
-            return !_poolData[poolName].AvalibleObjects.Any();
+            return _poolData[poolName].AvalibleObjects.Count == 0;
         }
 
         /// <summary>
@@ -197,7 +197,7 @@ namespace ParadoxFramework.General.Pool
             PoolExistChecker(poolName, "get instance");
 
             var data = _poolData[poolName];
-            if (!data.AvalibleObjects.Any())
+            if (data.AvalibleObjects.Count == 0)
                 return CreateInstance(poolName, data, true);
 
             var instance = data.AvalibleObjects.Pop();
@@ -276,7 +276,7 @@ namespace ParadoxFramework.General.Pool
         {
             var wait = new WaitForSeconds(0.05f);
 
-            while (data.AvalibleObjects.Any())
+            while (data.AvalibleObjects.Count > 0)
             {
                 Destroy(data.AvalibleObjects.Pop());
                 yield return wait;
@@ -316,11 +316,14 @@ namespace ParadoxFramework.General.Pool
 
         private static ParadoxPoolManager FindOrCreateDispatcher()
         {
-            var instance = GameObject.FindObjectOfType<ParadoxPoolManager>();
-            if (instance == null)
-                instance = new GameObject("--ParadoxPoolDispatcher--").AddComponent<ParadoxPoolManager>();
-
-            _instance = new OptionT<ParadoxPoolManager>(instance);
+            _instance = new OptionT<ParadoxPoolManager>(GameObject.FindGameObjectWithTag("PPoolManager").GetComponent<ParadoxPoolManager>(), CreateInstance());
+            return _instance.Get();
+        }
+        
+        private static ParadoxPoolManager CreateInstance()
+        {
+            var instance = new GameObject("--ParadoxPoolDispatcher--").AddComponent<ParadoxPoolManager>();
+            instance.tag = "PPoolManager";
             return instance;
         }
     }

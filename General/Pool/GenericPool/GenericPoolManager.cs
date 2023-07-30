@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using System.Linq;
 
 using ParadoxFramework.Utilities;
 using ParadoxFramework.General.Pool.ErrorHandler;
@@ -33,28 +32,17 @@ namespace ParadoxFramework.General.Pool
         public GenericPool(IPoolObject objPrefab, int amount)
         {
             _poolData.Prefab = objPrefab;
-            _poolData.OnFactory = objPrefab.FactoryMethod;
-            _poolData.OnPoolReturn = objPrefab.OnPoolReturn;
-            _poolData.OnDestroy = objPrefab.DisposeObject;
             _poolData.AvalibleObjects = new Stack<IPoolObject>();
 
             for (int i = 0; i < amount; i++)
                 CreateInstanceWithoutReturn();
         }
 
-        public IPoolObject this[int index]
-        {
-            get
-            {
-                return _poolData.AvalibleObjects.Skip(index).First();
-            }
-        }
-
         /// <summary>
         /// Return true if the pool is empty.
         /// </summary>
         /// <returns></returns>
-        public bool IsPoolEmpty() => !_poolData.AvalibleObjects.Any();
+        public bool IsPoolEmpty() => _poolData.AvalibleObjects.Count == 0;
 
         /// <summary>
         /// Return the actual amount of instances on the pool.
@@ -80,7 +68,7 @@ namespace ParadoxFramework.General.Pool
         /// <returns></returns>
         public IPoolObject GetInstance()
         {
-            if (!_poolData.AvalibleObjects.Any())
+            if (_poolData.AvalibleObjects.Count == 0)
                 return CreateInstance();
 
             return _poolData.AvalibleObjects.Pop();
@@ -92,19 +80,19 @@ namespace ParadoxFramework.General.Pool
         /// <returns></returns>
         public OptionT<IPoolObject> GetInstanceUnsafe()
         {
-            if (!_poolData.AvalibleObjects.Any())
+            if (_poolData.AvalibleObjects.Count == 0)
                 return new OptionT<IPoolObject>();
 
             return new OptionT<IPoolObject>(_poolData.AvalibleObjects.Pop());
         }
 
         /// <summary>
-        /// 
+        /// Return an instance to the pool.
         /// </summary>
         /// <param name="instance"></param>
         public void ReturnInstance(IPoolObject instance)
         {
-            _poolData.OnPoolReturn(instance);
+            _poolData.Prefab.OnPoolReturn(instance);
             _poolData.AvalibleObjects.Push(instance);
         }
 
@@ -113,8 +101,8 @@ namespace ParadoxFramework.General.Pool
         /// </summary>
         public void DisposePool()
         {
-            while (_poolData.AvalibleObjects.Any())
-                _poolData.OnDestroy(_poolData.AvalibleObjects.Pop());
+            while (_poolData.AvalibleObjects.Count > 0)
+                _poolData.AvalibleObjects.Pop().Dispose();
         }
 
         /// <summary>
@@ -124,9 +112,9 @@ namespace ParadoxFramework.General.Pool
         public IEnumerator TimeSlicingDispose()
         {
             var wait = new WaitForSeconds(0.05f);
-            while (_poolData.AvalibleObjects.Any())
+            while (_poolData.AvalibleObjects.Count > 0)
             {
-                _poolData.OnDestroy(_poolData.AvalibleObjects.Pop());
+                _poolData.AvalibleObjects.Pop().Dispose();
                 yield return wait;
             }
         }
@@ -134,13 +122,13 @@ namespace ParadoxFramework.General.Pool
 
         private IPoolObject CreateInstance()
         {
-            var instance = _poolData.OnFactory();
+            var instance = _poolData.Prefab.FactoryMethod();
             _poolData.AvalibleObjects.Push(instance);
             return instance;
         }
         private void CreateInstanceWithoutReturn()
         {
-            var instance = _poolData.OnFactory();
+            var instance = _poolData.Prefab.FactoryMethod();
             _poolData.AvalibleObjects.Push(instance);
         }
 
@@ -274,11 +262,14 @@ namespace ParadoxFramework.General.Pool
 
         private static GenericPoolManager FindOrCreateDispatcher()
         {
-            var instance = GameObject.FindObjectOfType<GenericPoolManager>();
-            if (instance == null)
-                instance = new GameObject("--GenericPoolDispatcher--").AddComponent<GenericPoolManager>();
+            _instance = new OptionT<GenericPoolManager>(GameObject.FindGameObjectWithTag("GPoolManager").GetComponent<GenericPoolManager>(), CreateInstance());
+            return _instance.Get();
+        }
 
-            _instance = new OptionT<GenericPoolManager>(instance);
+        private static GenericPoolManager CreateInstance()
+        {
+            var instance = new GameObject("--GenericPoolDispatcher--").AddComponent<GenericPoolManager>();
+            instance.tag = "GPoolManager";
             return instance;
         }
     }

@@ -8,9 +8,6 @@ namespace ParadoxFramework.General.Pool
     internal class GenericPoolData<T>
     {
         public T Prefab;
-        public Func<T> OnFactory;
-        public Action<T> OnPoolReturn;
-        public Action<T> OnDestroy;
         public Stack<T> AvalibleObjects;
     }
 }

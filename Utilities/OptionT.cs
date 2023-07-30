@@ -19,20 +19,20 @@ namespace ParadoxFramework.Utilities
             else
                 _hasValue = false;
         }
-        public OptionT(T value, T defaultValue) : this()
+        public OptionT(T value, T defaultValue, bool checkDefaultNull = false) : this()
         {
             if (value != null)
             {
                 _result = value;
                 _hasValue = true;
+                return;
             }
-            else if (defaultValue != null)
-            {
-                _result = defaultValue;
-                _hasValue = true;
-            }
-            else
-                _hasValue = false;
+
+            if (checkDefaultNull && defaultValue == null)
+                return;
+
+            _result = defaultValue;
+            _hasValue = true;
         }
 
         /// <summary>

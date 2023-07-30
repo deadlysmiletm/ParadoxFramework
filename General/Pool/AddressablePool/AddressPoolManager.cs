@@ -2,7 +2,6 @@
 
 using System.Collections.Generic;
 using System.Collections;
-using System.Linq;
 using System.Threading.Tasks;
 using System;
 using UnityEngine;
@@ -38,7 +37,7 @@ namespace ParadoxFramework.General.Pool
         public AddressCreationPoolArg(AddressPoolConfigData data) : this(data.Name, data.Amount, data.Reference) { }
     }
 
-    public class AddressPoolManager : MonoBehaviour
+    public sealed class AddressPoolManager : MonoBehaviour
     {
         private readonly Dictionary<string, AddressPoolData> _poolData = new();
         private static OptionT<AddressPoolManager> _instance;
@@ -54,13 +53,14 @@ namespace ParadoxFramework.General.Pool
             }
         }
 
-        public GameObject this[string poolName, int index]
+        /// <summary>
+        /// Get an instance from the pool, internally call GetInstanceAndWait.
+        /// </summary>
+        /// <param name="poolName"></param>
+        /// <returns></returns>
+        public GameObject this[string poolName]
         {
-            get
-            {
-                PoolExistChecker(poolName, "pool indexing");
-                return _poolData[poolName].AvalibleObjects.Skip(index).First();
-            }
+            get => GetInstanceAndWait(poolName);
         }
 
         /// <summary>
@@ -130,7 +130,7 @@ namespace ParadoxFramework.General.Pool
         public bool IsPoolEmpty(string poolName)
         {
             PoolExistChecker(poolName, "checking pool is empty");
-            return !_poolData[poolName].AvalibleObjects.Any();
+            return _poolData[poolName].AvalibleObjects.Count == 0;
         }
 
         /// <summary>
@@ -177,7 +177,7 @@ namespace ParadoxFramework.General.Pool
         /// <param name="onFactoryCreation"></param>
         public void AddOnFactoryPoolEvent(string poolName, Action<GameObject> onFactoryCreation)
         {
-            PoolExistChecker(poolName, "adding factory event");
+            PoolExistChecker(poolName,  "adding factory event");
             _poolData[poolName].OnFactoryCreation += onFactoryCreation;
         }
         /// <summary>
@@ -203,7 +203,7 @@ namespace ParadoxFramework.General.Pool
             PoolExistChecker(poolName, "get instance");
 
             var data = _poolData[poolName];
-            if (!data.AvalibleObjects.Any())
+            if (data.AvalibleObjects.Count == 0)
             {
                 CreateInstance(poolName, data, true, new OptionT<Action<GameObject>>(getCallback));
                 return;
@@ -225,7 +225,7 @@ namespace ParadoxFramework.General.Pool
             PoolExistChecker(poolName, "get instance unsafe");
 
             var data = _poolData[poolName];
-            var instance = data.AvalibleObjects.Any() ? data.AvalibleObjects.Pop() : null;
+            var instance = data.AvalibleObjects.Count > 0 ? data.AvalibleObjects.Pop() : null;
             return new OptionT<GameObject>(instance);
         }
         /// <summary>
@@ -238,7 +238,7 @@ namespace ParadoxFramework.General.Pool
             PoolExistChecker(poolName, "get instance and wait");
 
             var data = _poolData[poolName];
-            if (data.AvalibleObjects.Any())
+            if (data.AvalibleObjects.Count > 0)
                 return data.AvalibleObjects.Pop();
 
             return CreateInstanceAndWait(poolName, data, true);
@@ -256,7 +256,7 @@ namespace ParadoxFramework.General.Pool
             PoolExistChecker(poolName, "get instance async");
 
             var data = _poolData[poolName];
-            return data.AvalibleObjects.Any() ? data.AvalibleObjects.Pop() : await CreateInstanceAsync(poolName, data, true);
+            return data.AvalibleObjects.Count > 0 ? data.AvalibleObjects.Pop() : await CreateInstanceAsync(poolName, data, true);
         }
 
         /// <summary>
@@ -301,7 +301,7 @@ namespace ParadoxFramework.General.Pool
 
             var data = _poolData[poolName];
 
-            while (data.AvalibleObjects.Any())
+            while (data.AvalibleObjects.Count > 0)
                 Addressables.ReleaseInstance(data.AvalibleObjects.Pop());
 
             if (removePoolAndReleaseAsset)
@@ -320,7 +320,7 @@ namespace ParadoxFramework.General.Pool
         {
             foreach (var pool in _poolData.Values)
             {
-                while (pool.AvalibleObjects.Any())
+                while (pool.AvalibleObjects.Count > 0)
                     Addressables.ReleaseInstance(pool.AvalibleObjects.Pop());
                 pool.Prefab.ReleaseAsset();
             }
@@ -381,11 +381,14 @@ namespace ParadoxFramework.General.Pool
 
         private static AddressPoolManager FindOrCreateDispatcher()
         {
-            var instance = GameObject.FindObjectOfType<AddressPoolManager>();
-            if (instance == null)
-                instance = new GameObject("--AddressPoolDispatcher--").AddComponent<AddressPoolManager>();
+            _instance = new OptionT<AddressPoolManager>(GameObject.FindGameObjectWithTag("AddressPoolManager").GetComponent<AddressPoolManager>(), CreateInstance());
+            return _instance.Get();
+        }
 
-            _instance = new OptionT<AddressPoolManager>(instance);
+        private static AddressPoolManager CreateInstance()
+        {
+            var instance = new GameObject("--AddressPoolDispatcher--").AddComponent<AddressPoolManager>();
+            instance.tag = "AddressPoolManager";
             return instance;
         }
     }
