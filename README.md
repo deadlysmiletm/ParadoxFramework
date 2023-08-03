@@ -15,8 +15,6 @@ Simple modular Unity library with performance in mind (under construction).
   - **Dependencies:**
     - _OptionT_ in **Utilities** folder.
 
----
-
 ## General
 
 ### Pools
@@ -59,3 +57,18 @@ Simple modular Unity library with performance in mind (under construction).
   - Support persistent and not persistent managers.
   - Had _Game Object_ and _Addressables assets_ variations.
  
+## Utilities
+
+### Nullable pattern
+- Simple Option implementation.
+- Avoid multiple nullable comparation.
+- Support map, get mapped and iterate value.
+- Support create value without check.
+- Support create value with a default value (with default value check option).
+
+### Editor Utilities
+- Addressables editor utilities
+  - Simple utilities to make assets Addressables.
+  - Create or find a group.
+  - Check if a group exist.
+  - Create a new entry with labels.
