@@ -128,5 +128,11 @@ namespace ParadoxFramework.Utilities
             if (_hasValue)
                 iterate(_result);
         }
+
+
+        public static OptionT<T> NewOptionWithoutCheck(T value)
+        {
+            return new OptionT<T>() { _hasValue = true, _result = value };
+        }
     }
 }
