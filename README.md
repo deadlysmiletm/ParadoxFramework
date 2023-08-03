@@ -5,7 +5,7 @@ Simple modular Unity library with performance in mind (under construction).
 
 ## Abstract
 
-- Sinleton
+- Singleton
   - Simple singleton implementation.
   - Automatic creation when is needed (optimized search instance first to avoid double creation).
   - Nullable avoid pattern.
@@ -14,7 +14,9 @@ Simple modular Unity library with performance in mind (under construction).
   - Can be easily disposed.
   - **Dependencies:**
     - _OptionT_ in **Utilities** folder.
-   
+
+---
+
 ## General
 
 ### Pools
@@ -44,8 +46,6 @@ Simple modular Unity library with performance in mind (under construction).
   - No MonoBehaviour class.
   - Used by _Generic Pool Manager_.
 
----
- 
 ### Managers
 - Game Manager
   - Optimized update, fixed update and late update manager for game flow.
@@ -53,8 +53,6 @@ Simple modular Unity library with performance in mind (under construction).
   - Support disposable for every subscription.
   - Simple and easy to use with _IUpdateManaged_, _IFixedUpdateManaged_ and _ILateUpdateManaged_ interfaces.
  
----
-
 ### Project Initializer
 - Bootstrapper
   - Optimized autoloading on scene load objects initializer, perfect for managers.
